@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 用戶文檔規則
+    match /users/{userID} {
+      // 只允許用戶讀寫自己的文檔
+      allow read, write: if request.auth != null && request.auth.uid == userID;
+      
+      // 心情歷史子集合規則
+      match /moodHistory/{moodHistoryID} {
+        // 用戶可以讀寫自己的心情歷史
+        allow read, write: if request.auth != null && request.auth.uid == userID;
+      }
+      
+      // 情緒子集合規則（為未來功能預留）
+      match /moods/{moodID} {
+        // 用戶可以讀寫自己的情緒
+        allow read, write: if request.auth != null && request.auth.uid == userID;
+        
+        // 伴侶可以讀取（如果設定為可見）
+        allow read: if request.auth != null && 
+                   isPartner(request.auth.uid, userID) &&
+                   resource.data.privacy.isPrivate == false;
+      }
+    }
+    
+    // 配對關係規則（為未來功能預留）
+    match /partnerships/{partnershipID} {
+      // 只允許參與者讀寫
+      allow read, write: if request.auth != null && 
+                        (request.auth.uid in resource.data.users.user1.userID ||
+                         request.auth.uid in resource.data.users.user2.userID);
+    }
+    
+    // 模板規則（只讀）
+    match /templates/{templateID} {
+      allow read: if request.auth != null;
+    }
+    
+    // 檢查是否為伴侶的函數
+    function isPartner(currentUserID, targetUserID) {
+      return exists(/databases/$(database)/documents/users/$(currentUserID)) &&
+             get(/databases/$(database)/documents/users/$(currentUserID)).data.partnerID == targetUserID;
+    }
+  }
+} 

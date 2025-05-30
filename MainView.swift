@@ -11,6 +11,7 @@ struct MainView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var moodViewModel = MoodViewModel()
     @State private var showEmojiPicker = false
+    @State private var showMoodHistory = false
     
     var body: some View {
         ZStack {
@@ -130,7 +131,7 @@ struct MainView: View {
                                     title: "歷史",
                                     subtitle: "查看心情記錄"
                                 ) {
-                                    // TODO: 開啟歷史頁面
+                                    showMoodHistory = true
                                 }
                                 
                                 // 配對設定
@@ -174,6 +175,9 @@ struct MainView: View {
         .sheet(isPresented: $showEmojiPicker) {
             EmojiPickerView()
                 .environmentObject(moodViewModel)
+        }
+        .sheet(isPresented: $showMoodHistory) {
+            MoodHistoryView()
         }
         .alert("錯誤", isPresented: $moodViewModel.showAlert) {
             Button("確定", role: .cancel) { }

@@ -67,6 +67,9 @@ class MoodViewModel: ObservableObject {
             currentMood = emoji
             lastUpdated = Date()
             
+            // 同時將心情儲存到 moodHistory 子集合
+            await saveMoodToHistory(mood: emoji)
+            
         } catch {
             // 如果文檔不存在，嘗試建立
             do {
@@ -80,12 +83,40 @@ class MoodViewModel: ObservableObject {
                 currentMood = emoji
                 lastUpdated = Date()
                 
+                // 同時將心情儲存到 moodHistory 子集合
+                await saveMoodToHistory(mood: emoji)
+                
             } catch {
                 handleError(error)
             }
         }
         
         isLoading = false
+    }
+    
+    // MARK: - 儲存心情到歷史紀錄
+    func saveMoodToHistory(mood: String) async {
+        guard let currentUser = auth.currentUser else { return }
+        
+        do {
+            let moodHistoryData: [String: Any] = [
+                "mood": mood,
+                "timestamp": Timestamp()
+            ]
+            
+            // 使用自動 ID 新增文檔到 moodHistory 子集合
+            try await db.collection("users")
+                .document(currentUser.uid)
+                .collection("moodHistory")
+                .addDocument(data: moodHistoryData)
+            
+            print("成功儲存心情到歷史紀錄: \(mood)")
+            
+        } catch {
+            print("儲存心情歷史紀錄時發生錯誤: \(error.localizedDescription)")
+            // 這裡不顯示錯誤alert，因為主要功能（更新current mood）已經成功
+            // 只在console中記錄錯誤即可
+        }
     }
     
     // MARK: - 錯誤處理
