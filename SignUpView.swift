@@ -11,6 +11,9 @@ struct SignUpView: View {
     @State private var name = ""
     @State private var email = ""
     @State private var password = ""
+    @State private var showAlert = false
+    @State private var alertMessage = ""
+    @State private var isLoading = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -91,23 +94,30 @@ struct SignUpView: View {
                             
                             // 註冊按鈕
                             Button(action: {
-                                // 註冊動作
+                                handleSignUp()
                             }) {
                                 HStack(spacing: 8) {
-                                    Text("註冊")
-                                        .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                    Image(systemName: "arrow.right.circle.fill")
-                                        .font(.system(size: 16))
+                                    if isLoading {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Text("註冊")
+                                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                        Image(systemName: "arrow.right.circle.fill")
+                                            .font(.system(size: 16))
+                                    }
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 54)
                                 .background(
                                     RoundedRectangle(cornerRadius: 18)
-                                        .fill(Color("PrimaryColor"))
+                                        .fill(isLoading ? Color("PrimaryColor").opacity(0.7) : Color("PrimaryColor"))
                                         .shadow(color: Color("PrimaryColor").opacity(0.3), radius: 8, x: 0, y: 4)
                                 )
                             }
+                            .disabled(isLoading)
                             .buttonStyle(GentlePressStyle())
                             
                             // 登入提示 - 改為 NavigationLink
@@ -131,6 +141,61 @@ struct SignUpView: View {
             }
         }
         .navigationBarHidden(true)
+        .alert("提示", isPresented: $showAlert) {
+            Button("確定", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    // MARK: - 註冊處理函數
+    private func handleSignUp() {
+        // 驗證輸入
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            alertMessage = "請輸入姓名"
+            showAlert = true
+            return
+        }
+        
+        guard !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            alertMessage = "請輸入電子郵件"
+            showAlert = true
+            return
+        }
+        
+        guard isValidEmail(email) else {
+            alertMessage = "請輸入有效的電子郵件地址"
+            showAlert = true
+            return
+        }
+        
+        guard password.count >= 6 else {
+            alertMessage = "密碼必須至少6個字符"
+            showAlert = true
+            return
+        }
+        
+        // 模擬註冊過程
+        isLoading = true
+        
+        // 模擬網絡請求延遲
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            isLoading = false
+            alertMessage = "註冊成功！\n\n姓名：\(name)\n電子郵件：\(email)"
+            showAlert = true
+            
+            // 清空表單
+            name = ""
+            email = ""
+            password = ""
+        }
+    }
+    
+    // Email 驗證函數
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
     }
 }
 

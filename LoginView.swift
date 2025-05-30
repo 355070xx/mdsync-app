@@ -10,6 +10,9 @@ import SwiftUI
 struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
+    @State private var showAlert = false
+    @State private var alertMessage = ""
+    @State private var isLoading = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -82,23 +85,30 @@ struct LoginView: View {
                     
                     // 登入按鈕
                     Button(action: {
-                        // 登入動作
+                        handleLogin()
                     }) {
                         HStack(spacing: 8) {
-                            Text("登入")
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.system(size: 16))
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Text("登入")
+                                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 16))
+                            }
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
                         .background(
                             RoundedRectangle(cornerRadius: 18)
-                                .fill(Color("PrimaryColor"))
+                                .fill(isLoading ? Color("PrimaryColor").opacity(0.7) : Color("PrimaryColor"))
                                 .shadow(color: Color("PrimaryColor").opacity(0.3), radius: 8, x: 0, y: 4)
                         )
                     }
+                    .disabled(isLoading)
                     .buttonStyle(GentlePressStyle())
                     
                     // 註冊提示 - 改為 NavigationLink
@@ -120,6 +130,54 @@ struct LoginView: View {
             }
         }
         .navigationBarHidden(true)
+        .alert("提示", isPresented: $showAlert) {
+            Button("確定", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    // MARK: - 登入處理函數
+    private func handleLogin() {
+        // 驗證輸入
+        guard !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            alertMessage = "請輸入電子郵件"
+            showAlert = true
+            return
+        }
+        
+        guard isValidEmail(email) else {
+            alertMessage = "請輸入有效的電子郵件地址"
+            showAlert = true
+            return
+        }
+        
+        guard !password.isEmpty else {
+            alertMessage = "請輸入密碼"
+            showAlert = true
+            return
+        }
+        
+        // 模擬登入過程
+        isLoading = true
+        
+        // 模擬網絡請求延遲
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            isLoading = false
+            alertMessage = "登入成功！\n\n歡迎回來，\(email)"
+            showAlert = true
+            
+            // 清空表單
+            email = ""
+            password = ""
+        }
+    }
+    
+    // Email 驗證函數
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
     }
 }
 
