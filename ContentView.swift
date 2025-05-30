@@ -8,8 +8,19 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var authViewModel = AuthViewModel()
+    
     var body: some View {
-        WelcomeView()
+        Group {
+            if authViewModel.isLoggedIn {
+                MainView()
+                    .environmentObject(authViewModel)
+            } else {
+                WelcomeView()
+                    .environmentObject(authViewModel)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: authViewModel.isLoggedIn)
     }
 }
 
