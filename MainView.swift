@@ -9,6 +9,8 @@ import SwiftUI
 
 struct MainView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @StateObject private var moodViewModel = MoodViewModel()
+    @State private var showEmojiPicker = false
     
     var body: some View {
         ZStack {
@@ -79,27 +81,33 @@ struct MainView: View {
                                 .foregroundColor(Color("TextColor"))
                             
                             Button(action: {
-                                // TODO: 開啟心情選擇
+                                showEmojiPicker = true
                             }) {
                                 HStack(spacing: 12) {
-                                    Text("😊")
+                                    Text(moodViewModel.currentMood.isEmpty ? "😊" : moodViewModel.currentMood)
                                         .font(.system(size: 32))
                                     
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text("選擇今日心情")
+                                        Text(moodViewModel.currentMood.isEmpty ? "選擇今日心情" : "目前心情")
                                             .font(.system(size: 16, weight: .medium, design: .rounded))
                                             .foregroundColor(Color("TextColor"))
                                         
-                                        Text("點擊設定你的心情")
+                                        Text(moodViewModel.currentMood.isEmpty ? "點擊設定你的心情" : "更新於 \(moodViewModel.formatLastUpdated())")
                                             .font(.system(size: 14, weight: .medium, design: .rounded))
                                             .foregroundColor(Color("SecondaryColor"))
                                     }
                                     
                                     Spacer()
                                     
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(Color("SecondaryColor"))
+                                    if moodViewModel.isLoading {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                            .tint(Color("SecondaryColor"))
+                                    } else {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(Color("SecondaryColor"))
+                                    }
                                 }
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 16)
@@ -110,6 +118,7 @@ struct MainView: View {
                                 )
                             }
                             .buttonStyle(GentlePressStyle())
+                            .disabled(moodViewModel.isLoading)
                         }
                         
                         // 功能按鈕組
@@ -162,6 +171,20 @@ struct MainView: View {
             }
         }
         .navigationBarHidden(true)
+        .sheet(isPresented: $showEmojiPicker) {
+            EmojiPickerView()
+                .environmentObject(moodViewModel)
+        }
+        .alert("錯誤", isPresented: $moodViewModel.showAlert) {
+            Button("確定", role: .cancel) { }
+        } message: {
+            Text(moodViewModel.errorMessage)
+        }
+        .onChange(of: authViewModel.isLoggedIn) { _, isLoggedIn in
+            if isLoggedIn {
+                moodViewModel.loadCurrentMood()
+            }
+        }
     }
 }
 
