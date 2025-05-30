@@ -8,9 +8,6 @@
 import SwiftUI
 
 struct WelcomeView: View {
-    @State private var showLogin = false
-    @State private var showSignUp = false
-    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -19,7 +16,7 @@ struct WelcomeView: View {
                     gradient: Gradient(stops: [
                         .init(color: Color("Background"), location: 0.0),
                         .init(color: Color("Background").opacity(0.8), location: 0.3),
-                        .init(color: Color("Secondary").opacity(0.2), location: 1.0)
+                        .init(color: Color("SecondaryColor").opacity(0.2), location: 1.0)
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
@@ -34,14 +31,14 @@ struct WelcomeView: View {
                         // Logo Icon - 使用溫柔的陰影
                         Image(systemName: "heart.fill")
                             .font(.system(size: 65))
-                            .foregroundColor(Color("Primary"))
-                            .shadow(color: Color("Primary").opacity(0.3), radius: 8, x: 0, y: 4)
+                            .foregroundColor(Color("PrimaryColor"))
+                            .shadow(color: Color("PrimaryColor").opacity(0.3), radius: 8, x: 0, y: 4)
                         
                         // App 標題 - 更柔和的字體
                         Text("MoodSync")
                             .font(.system(size: 34, weight: .semibold, design: .rounded))
                             .foregroundColor(Color("TextColor"))
-                            .shadow(color: Color("Primary").opacity(0.2), radius: 4, x: 0, y: 2)
+                            .shadow(color: Color("PrimaryColor").opacity(0.2), radius: 4, x: 0, y: 2)
                     }
                     
                     // 插圖區域 - 更療癒的雙心設計
@@ -50,19 +47,19 @@ struct WelcomeView: View {
                             // 第一個心 - 主色
                             Image(systemName: "heart.fill")
                                 .font(.system(size: 36))
-                                .foregroundColor(Color("Primary"))
+                                .foregroundColor(Color("PrimaryColor"))
                                 .opacity(0.9)
                             
                             // 連接元素
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(Color("Primary").opacity(0.4))
+                                    .fill(Color("PrimaryColor").opacity(0.4))
                                     .frame(width: 4, height: 4)
                                 Circle()
                                     .fill(Color("AccentColor").opacity(0.5))
                                     .frame(width: 4, height: 4)
                                 Circle()
-                                    .fill(Color("Primary").opacity(0.4))
+                                    .fill(Color("PrimaryColor").opacity(0.4))
                                     .frame(width: 4, height: 4)
                             }
                             
@@ -97,10 +94,8 @@ struct WelcomeView: View {
                     
                     // 按鈕組 - 更溫柔的設計
                     VStack(spacing: 18) {
-                        // 主要按鈕 - 淡粉色背景 + 白色文字
-                        Button(action: {
-                            showSignUp = true
-                        }) {
+                        // 主要按鈕 - 使用 NavigationLink
+                        NavigationLink(destination: SignUpView()) {
                             HStack(spacing: 8) {
                                 Text("開始使用")
                                     .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -112,23 +107,21 @@ struct WelcomeView: View {
                             .frame(height: 54)
                             .background(
                                 RoundedRectangle(cornerRadius: 18)
-                                    .fill(Color("Primary"))
-                                    .shadow(color: Color("Primary").opacity(0.3), radius: 8, x: 0, y: 4)
+                                    .fill(Color("PrimaryColor"))
+                                    .shadow(color: Color("PrimaryColor").opacity(0.3), radius: 8, x: 0, y: 4)
                             )
                         }
                         .buttonStyle(GentlePressStyle())
                         
-                        // 次要按鈕 - 更柔和的文字按鈕
-                        Button(action: {
-                            showLogin = true
-                        }) {
+                        // 次要按鈕 - 使用 NavigationLink
+                        NavigationLink(destination: LoginView()) {
                             HStack(spacing: 6) {
                                 Text("已有帳號？")
                                     .font(.system(size: 16, weight: .medium, design: .rounded))
-                                    .foregroundColor(Color("Secondary"))
+                                    .foregroundColor(Color("SecondaryColor"))
                                 Text("登入")
                                     .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                    .foregroundColor(Color("Primary"))
+                                    .foregroundColor(Color("PrimaryColor"))
                             }
                         }
                         .buttonStyle(GentlePressStyle())
@@ -137,12 +130,6 @@ struct WelcomeView: View {
                     .padding(.bottom, 60)
                 }
             }
-        }
-        .navigationDestination(isPresented: $showLogin) {
-            LoginView()
-        }
-        .navigationDestination(isPresented: $showSignUp) {
-            SignUpView()
         }
     }
 }
@@ -170,43 +157,6 @@ struct SecondaryButtonStyle: ButtonStyle {
         configuration.label
             .opacity(configuration.isPressed ? 0.7 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Placeholder Views (待實作)
-struct LoginView: View {
-    var body: some View {
-        ZStack {
-            Color("Background").ignoresSafeArea()
-            
-            VStack {
-                Text("登入頁面")
-                    .font(.title2)
-                    .foregroundColor(Color("TextColor"))
-                Text("即將推出...")
-                    .font(.body)
-                    .foregroundColor(Color("Secondary"))
-            }
-        }
-        .navigationTitle("登入")
-    }
-}
-
-struct SignUpView: View {
-    var body: some View {
-        ZStack {
-            Color("Background").ignoresSafeArea()
-            
-            VStack {
-                Text("註冊頁面")
-                    .font(.title2)
-                    .foregroundColor(Color("TextColor"))
-                Text("即將推出...")
-                    .font(.body)
-                    .foregroundColor(Color("Secondary"))
-            }
-        }
-        .navigationTitle("註冊")
     }
 }
 
