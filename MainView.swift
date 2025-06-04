@@ -11,9 +11,11 @@ struct MainView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var moodViewModel = MoodViewModel()
     @StateObject private var reactionViewModel = ReactionViewModel()
+    @StateObject private var emotionChatNotificationViewModel = EmotionChatNotificationViewModel()
     @State private var showEmojiPicker = false
     @State private var showMoodHistory = false
     @State private var showPairing = false
+    @State private var showEmotionChat = false
     
     var body: some View {
         ZStack {
@@ -46,6 +48,13 @@ struct MainView: View {
                     .padding(.bottom, 20)
                 }
                 .background(Color("Background"))
+                
+                // 冷靜通道提示通知
+                if emotionChatNotificationViewModel.showNotification {
+                    emotionChatNotificationBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: emotionChatNotificationViewModel.showNotification)
+                }
                 
                 // 主要內容區域（使用 ScrollView 避免內容被截斷）
                 ScrollView {
@@ -261,6 +270,9 @@ struct MainView: View {
         }) {
             PairingView()
         }
+        .sheet(isPresented: $showEmotionChat) {
+            EmotionChatView()
+        }
         .alert("錯誤", isPresented: $moodViewModel.showAlert) {
             Button("確定", role: .cancel) { }
         } message: {
@@ -344,20 +356,25 @@ struct MainView: View {
                 moodViewModel.loadCurrentMood()
                 // 開始監聽回應
                 reactionViewModel.startListeningForReactions()
+                // 開始監聽冷靜通道通知
+                emotionChatNotificationViewModel.startListeningForPairing()
             } else {
                 // 登出時停止監聽
                 reactionViewModel.stopListeningForReactions()
+                emotionChatNotificationViewModel.stopListening()
             }
         }
         .onAppear {
             // 如果已經登入，開始監聽回應
             if authViewModel.isLoggedIn {
                 reactionViewModel.startListeningForReactions()
+                emotionChatNotificationViewModel.startListeningForPairing()
             }
         }
         .onDisappear {
             // 離開頁面時停止監聽
             reactionViewModel.stopListeningForReactions()
+            emotionChatNotificationViewModel.stopListening()
         }
     }
     
@@ -382,6 +399,60 @@ struct MainView: View {
         }
         
         return formatter.string(from: lastUpdated)
+    }
+    
+    // MARK: - 冷靜通道提示通知
+    private var emotionChatNotificationBanner: some View {
+        Button(action: {
+            Task {
+                await emotionChatNotificationViewModel.markAsRead()
+            }
+            showEmotionChat = true
+        }) {
+            HStack(spacing: 12) {
+                Text("💭")
+                    .font(.system(size: 20))
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(emotionChatNotificationViewModel.lastSenderName) 正在冷靜通道等你")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundColor(Color("TextColor"))
+                    
+                    Text("點擊查看訊息")
+                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .foregroundColor(Color("SecondaryColor"))
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    emotionChatNotificationViewModel.hideNotification()
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color("SecondaryColor"))
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(Color.gray.opacity(0.1))
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.pink.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.pink.opacity(0.3), lineWidth: 1.5)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, 24)
+        .padding(.bottom, 12)
     }
 }
 

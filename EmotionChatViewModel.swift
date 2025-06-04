@@ -19,6 +19,8 @@ class EmotionChatViewModel: ObservableObject {
     @Published var isEmotionChatEnabled = false
     @Published var pairedWith = ""
     @Published var partnerName = ""
+    @Published var showSuccessFeedback = false
+    @Published var successMessage = ""
     
     private let auth = Auth.auth()
     private let db = Firestore.firestore()
@@ -195,6 +197,18 @@ class EmotionChatViewModel: ObservableObject {
                 .collection("messages")
                 .addDocument(data: messageData)
             
+            // 顯示成功回饋
+            successMessage = "已發送 \(type.displayText)"
+            showSuccessFeedback = true
+            
+            // 2秒後隱藏回饋
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.showSuccessFeedback = false
+            }
+            
+            // 更新通知狀態
+            try await updateNotificationStatus(pairID: pairID, currentUser: currentUser)
+            
         } catch {
             handleError(error)
         }
@@ -202,8 +216,46 @@ class EmotionChatViewModel: ObservableObject {
         isLoading = false
     }
     
+    // MARK: - 更新通知狀態
+    private func updateNotificationStatus(pairID: String, currentUser: User) async throws {
+        let notificationData: [String: Any] = [
+            "hasUnread": true,
+            "lastSenderUID": currentUser.uid,
+            "lastSenderName": getUserName(),
+            "lastUpdated": Timestamp()
+        ]
+        
+        try await db.collection("emotionChats")
+            .document(pairID)
+            .collection("metadata")
+            .document("notification")
+            .setData(notificationData, merge: true)
+    }
+    
+    // MARK: - 標記為已讀
+    func markAsRead() async {
+        guard let currentUser = auth.currentUser, !pairedWith.isEmpty else { return }
+        
+        let pairID = createPairID(currentUserUID: currentUser.uid, partnerUID: pairedWith)
+        
+        do {
+            try await db.collection("emotionChats")
+                .document(pairID)
+                .collection("metadata")
+                .document("notification")
+                .updateData([
+                    "hasUnread": false
+                ])
+        } catch {
+            print("標記為已讀失敗: \(error)")
+        }
+    }
+    
     // MARK: - 發送快速回應
     func sendQuickResponse(type: EmotionChatMessage.MessageType) async {
+        // 確保聊天已啟用
+        guard isEmotionChatEnabled else { return }
+        
         await sendMessage(
             text: nil,
             emoji: type.defaultEmoji,

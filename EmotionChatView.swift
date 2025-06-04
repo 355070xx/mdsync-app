@@ -88,6 +88,36 @@ struct EmotionChatView: View {
         } message: {
             Text(viewModel.errorMessage)
         }
+        .overlay(
+            // 成功回饋訊息
+            VStack {
+                Spacer()
+                if viewModel.showSuccessFeedback {
+                    Text(viewModel.successMessage)
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color("PrimaryColor"))
+                                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: viewModel.showSuccessFeedback)
+                }
+            }
+            .padding(.bottom, 100)
+        )
+        .onAppear {
+            // 重新載入配對信息
+            viewModel.loadPairingInfo()
+            
+            // 標記為已讀
+            Task {
+                await viewModel.markAsRead()
+            }
+        }
     }
     
     // MARK: - 頂部提醒
@@ -300,7 +330,7 @@ struct EmotionChatView: View {
                 
                 // 快速回應按鈕
                 HStack(spacing: 12) {
-                    // 測試鍵盤按鈕
+                    // 鍵盤按鈕
                     Button(action: {
                         isTextFieldFocused = true
                     }) {
@@ -311,35 +341,56 @@ struct EmotionChatView: View {
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                         }
                         .foregroundColor(Color("PrimaryColor"))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color("PrimaryColor").opacity(0.1))
                         )
                     }
+                    .buttonStyle(PlainButtonStyle())
                     
                     ForEach([EmotionChatMessage.MessageType.apology, .hug, .neutral], id: \.self) { type in
                         Button(action: {
+                            // 添加觸覺回饋
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            
                             Task {
                                 await viewModel.sendQuickResponse(type: type)
                             }
                         }) {
                             HStack(spacing: 4) {
-                                Text(type.defaultEmoji)
-                                    .font(.system(size: 14))
+                                if viewModel.isLoading {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 14, height: 14)
+                                } else {
+                                    Text(type.defaultEmoji)
+                                        .font(.system(size: 16))
+                                }
+                                
                                 Text(type.displayText)
-                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .font(.system(size: 13, weight: .medium, design: .rounded))
                             }
-                            .foregroundColor(Color("TextColor"))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
+                            .foregroundColor(viewModel.isLoading ? Color("SecondaryColor") : Color("TextColor"))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(minWidth: 60, minHeight: 32)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.1))
+                                    .fill(viewModel.isLoading ? Color.gray.opacity(0.05) : Color.gray.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+                                    )
                             )
+                            .scaleEffect(viewModel.isLoading ? 0.95 : 1.0)
+                            .opacity(viewModel.isLoading ? 0.6 : 1.0)
                         }
+                        .buttonStyle(PlainButtonStyle())
                         .disabled(viewModel.isLoading)
+                        .contentShape(Rectangle())
                     }
                     
                     Spacer()
