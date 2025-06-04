@@ -20,22 +20,61 @@ class AuthViewModel: ObservableObject {
     
     private let auth = Auth.auth()
     private let db = Firestore.firestore()
+    private var authStateListener: AuthStateDidChangeListenerHandle?
     
     init() {
+        setupAuthStateListener()
         checkAuthState()
+    }
+    
+    deinit {
+        if let listener = authStateListener {
+            Auth.auth().removeStateDidChangeListener(listener)
+        }
+    }
+    
+    // MARK: - 設置認證狀態監聽器
+    private func setupAuthStateListener() {
+        authStateListener = auth.addStateDidChangeListener { [weak self] _, user in
+            DispatchQueue.main.async {
+                if let user = user {
+                    // 用戶已登入
+                    self?.isLoggedIn = true
+                    self?.userEmail = user.email ?? ""
+                    Task {
+                        await self?.loadUserProfile()
+                    }
+                } else {
+                    // 用戶已登出
+                    self?.clearAuthState()
+                }
+            }
+        }
     }
     
     // MARK: - 檢查登入狀態
     func checkAuthState() {
+        // 清理過期的本地狀態
         if let currentUser = auth.currentUser {
-            isLoggedIn = true
-            userEmail = currentUser.email ?? ""
-            // 使用 Task 來處理 async 調用
-            Task {
-                await loadUserProfile()
+            // 重新驗證當前用戶的認證狀態
+            currentUser.reload { [weak self] error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        // 認證已過期，清理狀態
+                        print("認證已過期: \(error.localizedDescription)")
+                        self?.clearAuthState()
+                    } else {
+                        // 認證有效，更新狀態
+                        self?.isLoggedIn = true
+                        self?.userEmail = currentUser.email ?? ""
+                        Task {
+                            await self?.loadUserProfile()
+                        }
+                    }
+                }
             }
         } else {
-            isLoggedIn = false
+            clearAuthState()
         }
     }
     
@@ -73,7 +112,18 @@ class AuthViewModel: ObservableObject {
         isLoading = true
         
         do {
-            try await auth.signIn(withEmail: email, password: password)
+            // 確保先清理之前的認證狀態
+            if auth.currentUser != nil {
+                try auth.signOut()
+            }
+            
+            // 執行登入
+            let result = try await auth.signIn(withEmail: email, password: password)
+            
+            // 確認用戶認證成功
+            guard let user = result.user.email else {
+                throw NSError(domain: "AuthError", code: -1, userInfo: [NSLocalizedDescriptionKey: "認證失敗"])
+            }
             
             // 載入使用者資料
             await loadUserProfile()
@@ -82,6 +132,7 @@ class AuthViewModel: ObservableObject {
             isLoggedIn = true
             
         } catch {
+            clearAuthState()
             handleAuthError(error)
         }
         
@@ -92,12 +143,21 @@ class AuthViewModel: ObservableObject {
     func signOut() {
         do {
             try auth.signOut()
-            isLoggedIn = false
-            userEmail = ""
-            userName = ""
+            clearAuthState()
         } catch {
             handleAuthError(error)
+            // 即使登出失敗，也要清理本地狀態
+            clearAuthState()
         }
+    }
+    
+    // MARK: - 清理認證狀態
+    private func clearAuthState() {
+        isLoggedIn = false
+        userEmail = ""
+        userName = ""
+        errorMessage = ""
+        showAlert = false
     }
     
     // MARK: - 儲存使用者資料到 Firestore
@@ -147,8 +207,19 @@ class AuthViewModel: ObservableObject {
                 errorMessage = "嘗試次數過多，請稍後再試"
             case AuthErrorCode.networkError.rawValue:
                 errorMessage = "網絡連接異常，請檢查網絡設置"
+            case AuthErrorCode.invalidCredential.rawValue:
+                errorMessage = "認證憑證無效，請重新登入"
+            case AuthErrorCode.credentialAlreadyInUse.rawValue:
+                errorMessage = "此認證憑證已被其他帳號使用"
+            case AuthErrorCode.sessionExpired.rawValue:
+                errorMessage = "登入會話已過期，請重新登入"
             default:
-                errorMessage = "登入發生錯誤：\(error.localizedDescription)"
+                // 檢查是否為認證憑證格式錯誤
+                if error.localizedDescription.contains("malformed") || error.localizedDescription.contains("expired") {
+                    errorMessage = "認證憑證已過期，請重新登入"
+                } else {
+                    errorMessage = "登入發生錯誤：\(error.localizedDescription)"
+                }
             }
         } else {
             errorMessage = "未知錯誤：\(error.localizedDescription)"

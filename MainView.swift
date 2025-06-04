@@ -12,6 +12,7 @@ struct MainView: View {
     @StateObject private var moodViewModel = MoodViewModel()
     @State private var showEmojiPicker = false
     @State private var showMoodHistory = false
+    @State private var showPairing = false
     
     var body: some View {
         ZStack {
@@ -19,156 +20,209 @@ struct MainView: View {
             Color("Background")
                 .ignoresSafeArea()
             
-            VStack(spacing: 32) {
-                // 頂部導航欄
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("歡迎回來")
-                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                            .foregroundColor(Color("SecondaryColor"))
-                        
-                        Text(authViewModel.userName.isEmpty ? "使用者" : authViewModel.userName)
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
-                            .foregroundColor(Color("TextColor"))
-                    }
+            VStack(spacing: 0) {
+                // 頂部導航欄（修正 Safe Area 和佈局）
+                VStack(spacing: 0) {
+                    // 狀態欄高度佔位
+                    Color.clear
+                        .frame(height: 0)
                     
-                    Spacer()
-                    
-                    // 設定按鈕
-                    Button(action: {
-                        authViewModel.signOut()
-                    }) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(Color("PrimaryColor"))
-                            .frame(width: 44, height: 44)
-                            .background(
-                                Circle()
-                                    .fill(.white)
-                                    .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                            )
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                
-                Spacer()
-                
-                // 主要內容區域
-                VStack(spacing: 40) {
-                    // Logo 與歡迎信息
-                    VStack(spacing: 20) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(Color("PrimaryColor"))
-                            .shadow(color: Color("PrimaryColor").opacity(0.3), radius: 8, x: 0, y: 4)
-                        
-                        VStack(spacing: 8) {
-                            Text("MoodSync")
-                                .font(.system(size: 28, weight: .semibold, design: .rounded))
-                                .foregroundColor(Color("TextColor"))
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("歡迎回來")
+                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                .foregroundColor(Color("SecondaryColor"))
                             
-                            Text("💕")
-                                .font(.system(size: 32))
-                        }
-                    }
-                    
-                    // 狀態卡片
-                    VStack(spacing: 24) {
-                        // 今日心情卡片
-                        VStack(spacing: 16) {
-                            Text("今日心情")
+                            Text(authViewModel.userName.isEmpty ? "使用者" : authViewModel.userName)
                                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                                 .foregroundColor(Color("TextColor"))
-                            
-                            Button(action: {
-                                showEmojiPicker = true
-                            }) {
-                                HStack(spacing: 12) {
-                                    Text(moodViewModel.currentMood.isEmpty ? "😊" : moodViewModel.currentMood)
-                                        .font(.system(size: 32))
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(moodViewModel.currentMood.isEmpty ? "選擇今日心情" : "目前心情")
-                                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                                            .foregroundColor(Color("TextColor"))
-                                        
-                                        Text(moodViewModel.currentMood.isEmpty ? "點擊設定你的心情" : "更新於 \(moodViewModel.formatLastUpdated())")
-                                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundColor(Color("SecondaryColor"))
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    if moodViewModel.isLoading {
-                                        ProgressView()
-                                            .scaleEffect(0.8)
-                                            .tint(Color("SecondaryColor"))
-                                    } else {
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundColor(Color("SecondaryColor"))
-                                    }
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(.white)
-                                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
-                                )
-                            }
-                            .buttonStyle(GentlePressStyle())
-                            .disabled(moodViewModel.isLoading)
                         }
                         
-                        // 功能按鈕組
-                        VStack(spacing: 16) {
-                            HStack(spacing: 16) {
-                                // 心情歷史
-                                MainFeatureButton(
-                                    icon: "clock",
-                                    title: "歷史",
-                                    subtitle: "查看心情記錄"
-                                ) {
-                                    showMoodHistory = true
-                                }
+                        Spacer()
+                        
+                        // 登出按鈕（擴大可點擊區域）
+                        Button(action: {
+                            authViewModel.signOut()
+                        }) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(Color("PrimaryColor"))
+                                .frame(width: 24, height: 24)
+                                .frame(width: 44, height: 44) // 擴大可點擊區域
+                                .background(
+                                    Circle()
+                                        .fill(.white)
+                                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle()) // 確保按鈕可以正常點擊
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, 20)
+                }
+                .background(Color("Background"))
+                
+                // 主要內容區域（使用 ScrollView 避免內容被截斷）
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // Logo 與歡迎信息
+                        VStack(spacing: 20) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(Color("PrimaryColor"))
+                                .shadow(color: Color("PrimaryColor").opacity(0.3), radius: 8, x: 0, y: 4)
+                            
+                            VStack(spacing: 8) {
+                                Text("MoodSync")
+                                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                                    .foregroundColor(Color("TextColor"))
                                 
-                                // 配對設定
-                                MainFeatureButton(
-                                    icon: "person.2",
-                                    title: "配對",
-                                    subtitle: "同步心情"
-                                ) {
-                                    // TODO: 開啟配對設定
+                                Text("💕")
+                                    .font(.system(size: 32))
+                            }
+                        }
+                        .padding(.top, 20)
+                        
+                        // 狀態卡片
+                        VStack(spacing: 24) {
+                            // 今日心情卡片
+                            VStack(spacing: 16) {
+                                Text("今日心情")
+                                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                                    .foregroundColor(Color("TextColor"))
+                                
+                                Button(action: {
+                                    showEmojiPicker = true
+                                }) {
+                                    HStack(spacing: 12) {
+                                        Text(moodViewModel.currentMood.isEmpty ? "😊" : moodViewModel.currentMood)
+                                            .font(.system(size: 32))
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(moodViewModel.currentMood.isEmpty ? "選擇今日心情" : "目前心情")
+                                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                                .foregroundColor(Color("TextColor"))
+                                            
+                                            Text(moodViewModel.currentMood.isEmpty ? "點擊設定你的心情" : "更新於 \(moodViewModel.formatLastUpdated())")
+                                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                                .foregroundColor(Color("SecondaryColor"))
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if moodViewModel.isLoading {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                                .tint(Color("SecondaryColor"))
+                                        } else {
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 14, weight: .medium))
+                                                .foregroundColor(Color("SecondaryColor"))
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(.white)
+                                            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                                    )
+                                }
+                                .buttonStyle(GentlePressStyle())
+                                .disabled(moodViewModel.isLoading)
+                            }
+                            
+                            // 伴侶心情卡片（只在已配對時顯示）
+                            if !moodViewModel.pairedWith.isEmpty {
+                                VStack(spacing: 16) {
+                                    Text("\(moodViewModel.partnerName.isEmpty ? "另一半" : moodViewModel.partnerName)的心情")
+                                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                                        .foregroundColor(Color("TextColor"))
+                                    
+                                    HStack(spacing: 12) {
+                                        Text(moodViewModel.partnerMood.isEmpty ? "❓" : moodViewModel.partnerMood)
+                                            .font(.system(size: 32))
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(moodViewModel.partnerMood.isEmpty ? "還沒設定心情" : "\(moodViewModel.partnerName.isEmpty ? "另一半" : moodViewModel.partnerName)的心情")
+                                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                                .foregroundColor(Color("TextColor"))
+                                            
+                                            Text(moodViewModel.partnerMood.isEmpty ? "提醒對方更新心情吧" : "更新於 \(formatPartnerLastUpdated())")
+                                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                                .foregroundColor(Color("SecondaryColor"))
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "heart.fill")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(Color("PrimaryColor"))
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color("PrimaryColor").opacity(0.05))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(Color("PrimaryColor").opacity(0.2), lineWidth: 1)
+                                            )
+                                    )
                                 }
                             }
                             
-                            HStack(spacing: 16) {
-                                // 設定
-                                MainFeatureButton(
-                                    icon: "gearshape",
-                                    title: "設定",
-                                    subtitle: "個人化設置"
-                                ) {
-                                    // TODO: 開啟設定頁面
+                            // 功能按鈕組
+                            VStack(spacing: 16) {
+                                HStack(spacing: 16) {
+                                    // 心情歷史
+                                    MainFeatureButton(
+                                        icon: "clock",
+                                        title: "歷史",
+                                        subtitle: "查看心情記錄"
+                                    ) {
+                                        showMoodHistory = true
+                                    }
+                                    
+                                    // 配對設定
+                                    MainFeatureButton(
+                                        icon: "person.2",
+                                        title: "配對",
+                                        subtitle: "同步心情"
+                                    ) {
+                                        showPairing = true
+                                    }
                                 }
                                 
-                                // 關於
-                                MainFeatureButton(
-                                    icon: "heart.text.square",
-                                    title: "關於",
-                                    subtitle: "了解 MoodSync"
-                                ) {
-                                    // TODO: 開啟關於頁面
+                                HStack(spacing: 16) {
+                                    // 設定
+                                    MainFeatureButton(
+                                        icon: "gearshape",
+                                        title: "設定",
+                                        subtitle: "個人化設置"
+                                    ) {
+                                        // TODO: 開啟設定頁面
+                                    }
+                                    
+                                    // 關於
+                                    MainFeatureButton(
+                                        icon: "heart.text.square",
+                                        title: "關於",
+                                        subtitle: "了解 MoodSync"
+                                    ) {
+                                        // TODO: 開啟關於頁面
+                                    }
                                 }
                             }
                         }
+                        .padding(.horizontal, 28)
+                        
+                        // 底部間距
+                        Color.clear
+                            .frame(height: 40)
                     }
                 }
-                .padding(.horizontal, 28)
-                
-                Spacer()
             }
         }
         .navigationBarHidden(true)
@@ -178,6 +232,12 @@ struct MainView: View {
         }
         .sheet(isPresented: $showMoodHistory) {
             MoodHistoryView()
+        }
+        .sheet(isPresented: $showPairing, onDismiss: {
+            // 配對頁面關閉後，重新檢查配對狀態
+            moodViewModel.checkPairingStatus()
+        }) {
+            PairingView()
         }
         .alert("錯誤", isPresented: $moodViewModel.showAlert) {
             Button("確定", role: .cancel) { }
@@ -189,6 +249,29 @@ struct MainView: View {
                 moodViewModel.loadCurrentMood()
             }
         }
+    }
+    
+    // MARK: - 格式化伴侶最後更新時間
+    private func formatPartnerLastUpdated() -> String {
+        guard let lastUpdated = moodViewModel.partnerLastUpdated else {
+            return "尚未設定"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_TW")
+        
+        let calendar = Calendar.current
+        let now = Date()
+        
+        if calendar.isDate(lastUpdated, inSameDayAs: now) {
+            formatter.dateFormat = "今天 HH:mm"
+        } else if calendar.isDate(lastUpdated, inSameDayAs: calendar.date(byAdding: .day, value: -1, to: now) ?? now) {
+            formatter.dateFormat = "昨天 HH:mm"
+        } else {
+            formatter.dateFormat = "MM/dd HH:mm"
+        }
+        
+        return formatter.string(from: lastUpdated)
     }
 }
 

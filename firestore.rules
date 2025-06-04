@@ -4,8 +4,15 @@ service cloud.firestore {
     
     // 用戶文檔規則
     match /users/{userID} {
-      // 只允許用戶讀寫自己的文檔
+      // 用戶可以完全控制自己的文檔
       allow read, write: if request.auth != null && request.auth.uid == userID;
+      
+      // 其他已登入用戶可以讀取基本資料（用於配對驗證）
+      allow read: if request.auth != null;
+      
+      // 配對功能：允許更新他人的 pairedWith 欄位（僅限配對操作）
+      allow update: if request.auth != null && 
+                   isValidPairingUpdate(request.auth.uid, userID, request.resource.data);
       
       // 心情歷史子集合規則
       match /moodHistory/{moodHistoryID} {
@@ -41,7 +48,25 @@ service cloud.firestore {
     // 檢查是否為伴侶的函數
     function isPartner(currentUserID, targetUserID) {
       return exists(/databases/$(database)/documents/users/$(currentUserID)) &&
-             get(/databases/$(database)/documents/users/$(currentUserID)).data.partnerID == targetUserID;
+             get(/databases/$(database)/documents/users/$(currentUserID)).data.pairedWith == targetUserID;
+    }
+    
+    // 驗證配對更新是否有效
+    function isValidPairingUpdate(requesterUID, targetUID, newData) {
+      let existingData = resource.data;
+      
+      // 檢查是否只更新了 pairedWith 欄位
+      let onlyPairedWithChanged = 
+        newData.keys().hasOnly(['name', 'email', 'createdAt', 'lastLoginAt', 'mood', 'lastUpdated', 'pairedWith']) &&
+        (newData.name == existingData.name || !existingData.keys().hasAny(['name'])) &&
+        (newData.email == existingData.email || !existingData.keys().hasAny(['email'])) &&
+        (newData.mood == existingData.mood || !existingData.keys().hasAny(['mood'])) &&
+        (newData.lastUpdated == existingData.lastUpdated || !existingData.keys().hasAny(['lastUpdated']));
+      
+      // 檢查 pairedWith 欄位是否設為請求者的 UID（雙向配對）
+      let validPairingValue = newData.pairedWith == requesterUID;
+      
+      return onlyPairedWithChanged && validPairingValue;
     }
   }
 } 

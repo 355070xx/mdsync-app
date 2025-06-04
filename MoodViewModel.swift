@@ -16,17 +16,31 @@ class MoodViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var showAlert = false
+    @Published var partnerMood: String = ""
+    @Published var partnerLastUpdated: Date?
+    @Published var pairedWith: String = ""
+    @Published var partnerName: String = ""
     
     private let auth = Auth.auth()
     private let db = Firestore.firestore()
     
     init() {
         loadCurrentMood()
+        checkPairingStatus()
     }
     
     // MARK: - 載入目前心情
     func loadCurrentMood() {
-        guard let currentUser = auth.currentUser else { return }
+        guard let currentUser = auth.currentUser else { 
+            // 清理狀態如果用戶未登入
+            currentMood = ""
+            lastUpdated = nil
+            pairedWith = ""
+            partnerMood = ""
+            partnerLastUpdated = nil
+            partnerName = ""
+            return 
+        }
         
         isLoading = true
         
@@ -70,6 +84,11 @@ class MoodViewModel: ObservableObject {
             // 同時將心情儲存到 moodHistory 子集合
             await saveMoodToHistory(mood: emoji)
             
+            // 如果有配對伴侶，重新載入伴侶心情
+            if !pairedWith.isEmpty {
+                await loadPartnerMood()
+            }
+            
         } catch {
             // 如果文檔不存在，嘗試建立
             do {
@@ -85,6 +104,11 @@ class MoodViewModel: ObservableObject {
                 
                 // 同時將心情儲存到 moodHistory 子集合
                 await saveMoodToHistory(mood: emoji)
+                
+                // 如果有配對伴侶，重新載入伴侶心情
+                if !pairedWith.isEmpty {
+                    await loadPartnerMood()
+                }
                 
             } catch {
                 handleError(error)
@@ -147,5 +171,52 @@ class MoodViewModel: ObservableObject {
         }
         
         return formatter.string(from: lastUpdated)
+    }
+    
+    // MARK: - 檢查配對狀態
+    func checkPairingStatus() {
+        guard let currentUser = auth.currentUser else { return }
+        
+        Task {
+            do {
+                let document = try await db.collection("users").document(currentUser.uid).getDocument()
+                
+                if let data = document.data(),
+                   let pairedWithUID = data["pairedWith"] as? String,
+                   !pairedWithUID.isEmpty {
+                    pairedWith = pairedWithUID
+                    // 載入伴侶心情和名稱
+                    await loadPartnerMood()
+                } else {
+                    // 清除伴侶相關資料
+                    pairedWith = ""
+                    partnerMood = ""
+                    partnerLastUpdated = nil
+                    partnerName = ""
+                }
+            } catch {
+                print("檢查配對狀態失敗: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    // MARK: - 載入伴侶心情
+    func loadPartnerMood() async {
+        guard !pairedWith.isEmpty else { return }
+        
+        do {
+            let document = try await db.collection("users").document(pairedWith).getDocument()
+            
+            if let data = document.data() {
+                partnerMood = data["mood"] as? String ?? ""
+                partnerName = data["name"] as? String ?? "未知用戶"
+                
+                if let timestamp = data["lastUpdated"] as? Timestamp {
+                    partnerLastUpdated = timestamp.dateValue()
+                }
+            }
+        } catch {
+            print("載入伴侶心情失敗: \(error.localizedDescription)")
+        }
     }
 } 
