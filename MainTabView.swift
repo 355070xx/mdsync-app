@@ -83,6 +83,7 @@ struct MainHomeView: View {
     @StateObject private var moodViewModel = MoodViewModel()
     @StateObject private var reactionViewModel = ReactionViewModel()
     @State private var showEmojiPicker = false
+    @State private var showEmotionChat = false
     
     var body: some View {
         NavigationStack {
@@ -263,14 +264,52 @@ struct MainHomeView: View {
                                         }
                                         .padding(.top, 8)
                                     }
+                                    
+                                    // 冷靜通道入口按鈕（只在已配對時顯示）
+                                    Button(action: {
+                                        showEmotionChat = true
+                                    }) {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: "cloud.rain")
+                                                .font(.system(size: 24))
+                                                .foregroundColor(.gray)
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text("🌧️ 想開啟冷靜通道？")
+                                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                                                    .foregroundColor(Color("TextColor"))
+                                                
+                                                Text("一個安全的情緒對話空間")
+                                                    .font(.system(size: 13, weight: .regular, design: .rounded))
+                                                    .foregroundColor(Color("SecondaryColor"))
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 14, weight: .medium))
+                                                .foregroundColor(Color("SecondaryColor"))
+                                        }
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 16)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .fill(Color.gray.opacity(0.05))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 16)
+                                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                                )
+                                        )
+                                    }
+                                    .buttonStyle(GentlePressStyle())
                                 }
                             }
-                            .padding(.horizontal, 28)
-                            
-                            // 底部間距
-                            Color.clear
-                                .frame(height: 40)
                         }
+                        .padding(.horizontal, 28)
+                        
+                        // 底部間距
+                        Color.clear
+                            .frame(height: 40)
                     }
                 }
             }
@@ -278,6 +317,9 @@ struct MainHomeView: View {
             .sheet(isPresented: $showEmojiPicker) {
                 EmojiPickerView()
                     .environmentObject(moodViewModel)
+            }
+            .sheet(isPresented: $showEmotionChat) {
+                EmotionChatView()
             }
             .alert("錯誤", isPresented: $moodViewModel.showAlert) {
                 Button("確定", role: .cancel) { }

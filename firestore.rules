@@ -45,6 +45,38 @@ service cloud.firestore {
       }
     }
     
+    // 情緒聊天規則
+    match /emotionChats/{pairID} {
+      // 只允許配對的用戶訪問
+      allow read, write: if request.auth != null && 
+                        isUserInPair(request.auth.uid, pairID);
+      
+      // 聊天狀態子集合
+      match /metadata/{metadataID} {
+        // 只允許配對的用戶訪問
+        allow read, write: if request.auth != null && 
+                          isUserInPair(request.auth.uid, pairID);
+      }
+      
+      // 訊息子集合
+      match /messages/{messageID} {
+        // 只允許配對的用戶讀取
+        allow read: if request.auth != null && 
+                   isUserInPair(request.auth.uid, pairID);
+        
+        // 只允許配對的用戶發送訊息，且必須設定自己的 fromUID
+        allow create: if request.auth != null && 
+                     isUserInPair(request.auth.uid, pairID) &&
+                     request.resource.data.fromUID == request.auth.uid &&
+                     request.resource.data.keys().hasAll(['fromUID', 'fromName', 'type', 'createdAt', 'expiresAt']) &&
+                     request.resource.data.type in ['message', 'apology', 'hug', 'reject', 'neutral'] &&
+                     request.resource.data.expiresAt.toMillis() > request.time.toMillis();
+        
+        // 不允許修改或刪除訊息
+        allow update, delete: if false;
+      }
+    }
+    
     // 配對關係規則（為未來功能預留）
     match /partnerships/{partnershipID} {
       // 只允許參與者讀寫
@@ -62,6 +94,14 @@ service cloud.firestore {
     function isPartner(currentUserID, targetUserID) {
       return exists(/databases/$(database)/documents/users/$(currentUserID)) &&
              get(/databases/$(database)/documents/users/$(currentUserID)).data.pairedWith == targetUserID;
+    }
+    
+    // 檢查用戶是否在配對中的函數
+    function isUserInPair(userUID, pairID) {
+      // pairID 格式應該是 "uid1_uid2"，其中 uid1 < uid2（按字典序排序）
+      let splitPair = pairID.split('_');
+      return splitPair.size() == 2 && 
+             (userUID == splitPair[0] || userUID == splitPair[1]);
     }
     
     // 驗證配對更新是否有效
