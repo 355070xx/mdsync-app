@@ -20,6 +20,19 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == userID;
       }
       
+      // 回應子集合規則
+      match /reactions/{reactionID} {
+        // 用戶可以讀取自己收到的回應
+        allow read: if request.auth != null && request.auth.uid == userID;
+        
+        // 已登入用戶可以寫入回應（發送給任何人）
+        // 但只能設定自己的 fromUID
+        allow create: if request.auth != null && 
+                     request.resource.data.fromUID == request.auth.uid &&
+                     request.resource.data.keys().hasAll(['fromUID', 'fromName', 'emoji', 'timestamp']) &&
+                     request.resource.data.keys().hasOnly(['fromUID', 'fromName', 'emoji', 'timestamp']);
+      }
+      
       // 情緒子集合規則（為未來功能預留）
       match /moods/{moodID} {
         // 用戶可以讀寫自己的情緒

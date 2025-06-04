@@ -10,6 +10,7 @@ import SwiftUI
 struct MainView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var moodViewModel = MoodViewModel()
+    @StateObject private var reactionViewModel = ReactionViewModel()
     @State private var showEmojiPicker = false
     @State private var showMoodHistory = false
     @State private var showPairing = false
@@ -170,6 +171,44 @@ struct MainView: View {
                                                     .stroke(Color("PrimaryColor").opacity(0.2), lineWidth: 1)
                                             )
                                     )
+                                    
+                                    // Emoji 回應區域
+                                    VStack(spacing: 12) {
+                                        Text("送個回應給 TA 吧 💕")
+                                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                                            .foregroundColor(Color("SecondaryColor"))
+                                        
+                                        HStack(spacing: 16) {
+                                            let emojis = ["❤️", "🤗", "💨", "👍", "😘", "🥺"]
+                                            
+                                            ForEach(emojis, id: \.self) { emoji in
+                                                Button(action: {
+                                                    Task {
+                                                        await reactionViewModel.sendReaction(
+                                                            emoji: emoji,
+                                                            toPartnerUID: moodViewModel.pairedWith,
+                                                            partnerName: moodViewModel.partnerName.isEmpty ? "另一半" : moodViewModel.partnerName,
+                                                            fromName: authViewModel.userName.isEmpty ? "用戶" : authViewModel.userName
+                                                        )
+                                                    }
+                                                }) {
+                                                    Text(emoji)
+                                                        .font(.system(size: 24))
+                                                        .frame(width: 44, height: 44)
+                                                        .background(
+                                                            Circle()
+                                                                .fill(.white)
+                                                                .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+                                                        )
+                                                        .scaleEffect(reactionViewModel.isLoading ? 0.95 : 1.0)
+                                                        .opacity(reactionViewModel.isLoading ? 0.6 : 1.0)
+                                                }
+                                                .buttonStyle(PlainButtonStyle())
+                                                .disabled(reactionViewModel.isLoading)
+                                            }
+                                        }
+                                    }
+                                    .padding(.top, 8)
                                 }
                             }
                             
@@ -244,6 +283,32 @@ struct MainView: View {
         } message: {
             Text(moodViewModel.errorMessage)
         }
+        .alert("錯誤", isPresented: $reactionViewModel.showAlert) {
+            Button("確定", role: .cancel) { }
+        } message: {
+            Text(reactionViewModel.errorMessage)
+        }
+        .overlay(
+            // 成功回饋訊息
+            VStack {
+                Spacer()
+                if reactionViewModel.showFeedback {
+                    Text(reactionViewModel.feedbackMessage)
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color("PrimaryColor"))
+                                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: reactionViewModel.showFeedback)
+                }
+            }
+            .padding(.bottom, 50)
+        )
         .onChange(of: authViewModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 moodViewModel.loadCurrentMood()
