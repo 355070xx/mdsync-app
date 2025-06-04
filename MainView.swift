@@ -40,23 +40,6 @@ struct MainView: View {
                         }
                         
                         Spacer()
-                        
-                        // 登出按鈕（擴大可點擊區域）
-                        Button(action: {
-                            authViewModel.signOut()
-                        }) {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(Color("PrimaryColor"))
-                                .frame(width: 24, height: 24)
-                                .frame(width: 44, height: 44) // 擴大可點擊區域
-                                .background(
-                                    Circle()
-                                        .fill(.white)
-                                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle()) // 確保按鈕可以正常點擊
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
