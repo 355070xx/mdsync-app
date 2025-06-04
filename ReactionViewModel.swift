@@ -17,8 +17,17 @@ class ReactionViewModel: ObservableObject {
     @Published var feedbackMessage = ""
     @Published var showFeedback = false
     
+    // 新增：最新回應相關屬性
+    @Published var latestReaction: Reaction?
+    @Published var showReactionNotification = false
+    @Published var notificationMessage = ""
+    
     private let auth = Auth.auth()
     private let db = Firestore.firestore()
+    private var reactionListener: ListenerRegistration?
+    
+    // 用於追蹤已顯示過的回應，避免重複提示
+    private var lastNotifiedReactionId: String?
     
     // MARK: - 發送 emoji 回應
     func sendReaction(emoji: String, toPartnerUID: String, partnerName: String, fromName: String) async {
@@ -62,6 +71,70 @@ class ReactionViewModel: ObservableObject {
         }
         
         isLoading = false
+    }
+    
+    // MARK: - 開始監聽回應
+    func startListeningForReactions() {
+        guard let currentUser = auth.currentUser else { return }
+        
+        // 停止之前的監聽器
+        stopListeningForReactions()
+        
+        reactionListener = db.collection("users")
+            .document(currentUser.uid)
+            .collection("reactions")
+            .order(by: "timestamp", descending: true)
+            .limit(to: 1)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("監聽回應錯誤: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let documents = snapshot?.documents, !documents.isEmpty else {
+                    print("沒有回應記錄")
+                    return
+                }
+                
+                do {
+                    let reaction = try documents[0].data(as: Reaction.self)
+                    self.latestReaction = reaction
+                    
+                    // 檢查是否需要顯示通知（避免重複提示）
+                    if let reactionId = reaction.id,
+                       reactionId != self.lastNotifiedReactionId {
+                        self.showReactionNotificationBanner(for: reaction)
+                        self.lastNotifiedReactionId = reactionId
+                    }
+                    
+                } catch {
+                    print("解析回應資料錯誤: \(error.localizedDescription)")
+                }
+            }
+    }
+    
+    // MARK: - 停止監聽回應
+    func stopListeningForReactions() {
+        reactionListener?.remove()
+        reactionListener = nil
+    }
+    
+    // MARK: - 顯示回應通知
+    private func showReactionNotificationBanner(for reaction: Reaction) {
+        notificationMessage = "\(reaction.fromName) 給了你一個 \(reaction.emoji) 回應 💬"
+        
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            showReactionNotification = true
+        }
+        
+        // 3秒後自動隱藏通知
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.showReactionNotification = false
+            }
+        }
     }
     
     // MARK: - 錯誤處理

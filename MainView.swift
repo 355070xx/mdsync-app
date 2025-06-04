@@ -309,10 +309,72 @@ struct MainView: View {
             }
             .padding(.bottom, 50)
         )
+        .overlay(
+            // 回應通知 Banner
+            VStack {
+                if reactionViewModel.showReactionNotification {
+                    HStack(spacing: 12) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(Color("PrimaryColor"))
+                        
+                        Text(reactionViewModel.notificationMessage)
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundColor(Color("TextColor"))
+                            .multilineTextAlignment(.leading)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                reactionViewModel.showReactionNotification = false
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color("SecondaryColor"))
+                                .frame(width: 20, height: 20)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color("PrimaryColor").opacity(0.3), lineWidth: 1.5)
+                            )
+                            .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: 4)
+                    )
+                    .padding(.horizontal, 24)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                Spacer()
+            }
+            .padding(.top, 60)
+            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: reactionViewModel.showReactionNotification)
+        )
         .onChange(of: authViewModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 moodViewModel.loadCurrentMood()
+                // 開始監聽回應
+                reactionViewModel.startListeningForReactions()
+            } else {
+                // 登出時停止監聽
+                reactionViewModel.stopListeningForReactions()
             }
+        }
+        .onAppear {
+            // 如果已經登入，開始監聽回應
+            if authViewModel.isLoggedIn {
+                reactionViewModel.startListeningForReactions()
+            }
+        }
+        .onDisappear {
+            // 離開頁面時停止監聽
+            reactionViewModel.stopListeningForReactions()
         }
     }
     
