@@ -75,7 +75,8 @@ service cloud.firestore {
         // 允許回覆訊息（只能更新 replyStatus 和 replyByUID 欄位）
         allow update: if request.auth != null && 
                      isUserInPair(request.auth.uid, pairID) &&
-                     isValidReplyUpdate(request.auth.uid, resource.data);
+                     (isValidReplyUpdate(request.auth.uid, resource.data) ||
+                      isValidStarUpdate());
         
         // 不允許刪除訊息
         allow delete: if false;
@@ -145,6 +146,17 @@ service cloud.firestore {
       let validReplyStatus = request.resource.data.replyStatus in ['accepted', 'later'];
       
       return notPreviouslyReplied && notSelfReply && onlyAllowedFields && validReplier && validReplyStatus;
+    }
+    
+    // 驗證收藏更新是否有效
+    function isValidStarUpdate() {
+      // 檢查是否只更新了 isStarred 欄位
+      let onlyStarredFieldChanged = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isStarred']);
+      
+      // 檢查 isStarred 是否為布林值
+      let validStarredValue = request.resource.data.isStarred is bool;
+      
+      return onlyStarredFieldChanged && validStarredValue;
     }
   }
 } 

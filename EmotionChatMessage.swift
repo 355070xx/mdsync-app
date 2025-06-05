@@ -22,6 +22,9 @@ struct EmotionChatMessage: Identifiable, Codable {
     let replyStatus: ReplyStatus?
     let replyByUID: String?
     
+    // 新增收藏狀態欄位
+    let isStarred: Bool?
+    
     enum ReplyStatus: String, CaseIterable, Codable {
         case accepted = "accepted"
         case later = "later"

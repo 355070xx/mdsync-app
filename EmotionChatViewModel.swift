@@ -191,7 +191,8 @@ class EmotionChatViewModel: ObservableObject {
                 "createdAt": Timestamp(),
                 "expiresAt": expiresAt,
                 "replyStatus": NSNull(),
-                "replyByUID": NSNull()
+                "replyByUID": NSNull(),
+                "isStarred": false
             ]
             
             try await db.collection("emotionChats")
@@ -372,6 +373,36 @@ class EmotionChatViewModel: ObservableObject {
         return message.fromUID == auth.currentUser?.uid
     }
     
+    // MARK: - 切換訊息收藏狀態
+    func toggleMessageStar(messageID: String, currentIsStarred: Bool) async {
+        guard let currentUser = auth.currentUser, !pairedWith.isEmpty, isEmotionChatEnabled else { return }
+        
+        do {
+            let pairID = createPairID(currentUserUID: currentUser.uid, partnerUID: pairedWith)
+            
+            // 更新訊息的收藏狀態
+            try await db.collection("emotionChats")
+                .document(pairID)
+                .collection("messages")
+                .document(messageID)
+                .updateData([
+                    "isStarred": !currentIsStarred
+                ])
+            
+            // 顯示成功回饋
+            successMessage = currentIsStarred ? "已取消收藏" : "已收藏訊息"
+            showSuccessFeedback = true
+            
+            // 2秒後隱藏回饋
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.showSuccessFeedback = false
+            }
+            
+        } catch {
+            handleError(error)
+        }
+    }
+    
     // MARK: - 顯示成功訊息的助手函數
     private func showSuccessMessage(_ message: String) async {
         await MainActor.run {
@@ -452,7 +483,8 @@ class EmotionChatViewModel: ObservableObject {
                 "createdAt": Timestamp(date: Calendar.current.date(byAdding: .minute, value: -testMessage.minutesAgo, to: now) ?? now),
                 "expiresAt": Timestamp(date: Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now),
                 "replyStatus": NSNull(),
-                "replyByUID": NSNull()
+                "replyByUID": NSNull(),
+                "isStarred": false
             ]
             
             do {
@@ -493,7 +525,8 @@ class EmotionChatViewModel: ObservableObject {
                 "createdAt": Timestamp(date: Calendar.current.date(byAdding: .day, value: -expiredMessage.daysAgo, to: now) ?? now),
                 "expiresAt": Timestamp(date: Calendar.current.date(byAdding: .day, value: -(expiredMessage.daysAgo - 7), to: now) ?? now), // 已過期
                 "replyStatus": NSNull(),
-                "replyByUID": NSNull()
+                "replyByUID": NSNull(),
+                "isStarred": false
             ]
             
             do {

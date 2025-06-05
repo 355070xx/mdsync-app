@@ -7,13 +7,13 @@
 
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
 
 struct EmotionChatView: View {
     @StateObject private var viewModel = EmotionChatViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var messageText = ""
-    @State private var selectedMessageType: EmotionChatMessage.MessageType = .message
-    @State private var showingTypePicker = false
+    @State private var selectedTag: String = "neutral"
     @FocusState private var isTextFieldFocused: Bool
     
     var body: some View {
@@ -280,6 +280,11 @@ struct EmotionChatView: View {
                                 Task {
                                     await viewModel.replyToMessage(messageID: messageID, replyStatus: replyStatus)
                                 }
+                            },
+                            onToggleStar: { messageID, currentIsStarred in
+                                Task {
+                                    await viewModel.toggleMessageStar(messageID: messageID, currentIsStarred: currentIsStarred)
+                                }
                             }
                         )
                     }
@@ -304,30 +309,76 @@ struct EmotionChatView: View {
                 .background(Color.gray.opacity(0.3))
             
             VStack(spacing: 12) {
-                // 訊息類型選擇
-                HStack(spacing: 8) {
-                    Text("類型:")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundColor(Color("SecondaryColor"))
-                    
+                // 訊息類型選擇 - 改為 Emoji 按鈕
+                HStack(spacing: 12) {
+                    // 道歉按鈕
                     Button(action: {
-                        showingTypePicker = true
+                        selectedTag = "apology"
+                        messageText = "對唔住，唔係想傷害你"
+                        
+                        // 添加觸覺回饋
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
                     }) {
-                        HStack(spacing: 4) {
-                            Text(selectedMessageType.defaultEmoji)
-                            Text(selectedMessageType.displayText)
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 12))
-                        }
-                        .foregroundColor(Color("TextColor"))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.1))
-                        )
+                        Text("🙏")
+                            .font(.system(size: 20))
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(selectedTag == "apology" ? Color("PrimaryColor").opacity(0.2) : Color.white)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(selectedTag == "apology" ? Color("PrimaryColor") : Color.gray.opacity(0.3), lineWidth: 1.5)
+                                    )
+                            )
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // 擁抱按鈕
+                    Button(action: {
+                        selectedTag = "hug"
+                        messageText = "我哋可以唔講野先，淨係抱下"
+                        
+                        // 添加觸覺回饋
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                    }) {
+                        Text("🫂")
+                            .font(.system(size: 20))
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(selectedTag == "hug" ? Color("PrimaryColor").opacity(0.2) : Color.white)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(selectedTag == "hug" ? Color("PrimaryColor") : Color.gray.opacity(0.3), lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // 中性按鈕
+                    Button(action: {
+                        selectedTag = "neutral"
+                        messageText = "我而家未 ready 講，但我會聽你講"
+                        
+                        // 添加觸覺回饋
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                    }) {
+                        Text("😐")
+                            .font(.system(size: 20))
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(selectedTag == "neutral" ? Color("PrimaryColor").opacity(0.2) : Color.white)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(selectedTag == "neutral" ? Color("PrimaryColor") : Color.gray.opacity(0.3), lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
                     
                     Spacer()
                 }
@@ -448,14 +499,6 @@ struct EmotionChatView: View {
             .padding(.vertical, 12)
             .background(Color(red: 1.0, green: 1.0, blue: 0.98))  // 溫暖的白色
         }
-        .confirmationDialog("選擇訊息類型", isPresented: $showingTypePicker, titleVisibility: .visible) {
-            ForEach(EmotionChatMessage.MessageType.allCases, id: \.self) { type in
-                Button("\(type.defaultEmoji) \(type.displayText)") {
-                    selectedMessageType = type
-                }
-            }
-            Button("取消", role: .cancel) { }
-        }
     }
     
     // MARK: - 發送訊息
@@ -463,11 +506,30 @@ struct EmotionChatView: View {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         
+        // 根據 selectedTag 決定訊息類型和 emoji
+        let messageType: EmotionChatMessage.MessageType
+        let emoji: String
+        
+        switch selectedTag {
+        case "apology":
+            messageType = .apology
+            emoji = "🙏"
+        case "hug":
+            messageType = .hug
+            emoji = "🫂"
+        case "neutral":
+            messageType = .neutral
+            emoji = "😐"
+        default:
+            messageType = .neutral
+            emoji = "😐"
+        }
+        
         Task {
             await viewModel.sendMessage(
                 text: text,
-                emoji: selectedMessageType.defaultEmoji,
-                type: selectedMessageType
+                emoji: emoji,
+                type: messageType
             )
             
             // 清空輸入框但保持焦點
@@ -482,6 +544,7 @@ struct MessageBubbleView: View {
     let isCurrentUser: Bool
     let onQuickResponse: ((EmotionChatMessage.MessageType) -> Void)?
     let onReply: ((String, EmotionChatMessage.ReplyStatus) -> Void)?
+    let onToggleStar: ((String, Bool) -> Void)?
     
     var body: some View {
         HStack {
@@ -490,35 +553,64 @@ struct MessageBubbleView: View {
             }
             
             VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
-                // 訊息內容
-                HStack(spacing: 8) {
-                    if let emoji = message.emoji, !emoji.isEmpty {
-                        Text(emoji)
-                            .font(.system(size: 18))
+                // 訊息內容與星星按鈕
+                ZStack(alignment: .topTrailing) {
+                    HStack(spacing: 8) {
+                        if let emoji = message.emoji, !emoji.isEmpty {
+                            Text(emoji)
+                                .font(.system(size: 18))
+                        }
+                        
+                        if let text = message.text, !text.isEmpty {
+                            Text(text)
+                                .font(.system(size: 16, weight: .regular, design: .rounded))
+                                .foregroundColor(isCurrentUser ? 
+                                               Color(red: 0.1, green: 0.2, blue: 0.4) :  // 深藍灰
+                                               Color(red: 0.2, green: 0.2, blue: 0.2))   // 深灰
+                        }
+                        
+                        // 為星星按鈕預留空間
+                        Spacer(minLength: 20)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(isCurrentUser ? 
+                                  Color(red: 0.7, green: 0.85, blue: 1.0) :    // 淺藍色（用戶訊息）
+                                  Color(red: 0.94, green: 0.94, blue: 0.92))   // 改為米白色（對方訊息）
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(isCurrentUser ? 
+                                           Color.clear : 
+                                           Color(red: 0.8, green: 0.8, blue: 0.78), lineWidth: 1)  // 對方訊息添加邊框
+                            )
+                    )
                     
-                    if let text = message.text, !text.isEmpty {
-                        Text(text)
-                            .font(.system(size: 16, weight: .regular, design: .rounded))
-                            .foregroundColor(isCurrentUser ? 
-                                           Color(red: 0.1, green: 0.2, blue: 0.4) :  // 深藍灰
-                                           Color(red: 0.2, green: 0.2, blue: 0.2))   // 深灰
+                    // 星星按鈕（右上角）
+                    Button(action: {
+                        guard let messageID = message.id else { return }
+                        let currentIsStarred = message.isStarred ?? false
+                        
+                        // 添加觸覺回饋
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        
+                        onToggleStar?(messageID, currentIsStarred)
+                    }) {
+                        Image(systemName: (message.isStarred ?? false) ? "star.fill" : "star")
+                            .font(.system(size: 14))
+                            .foregroundColor((message.isStarred ?? false) ? Color.yellow : Color.gray.opacity(0.6))
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.8))
+                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                            )
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    .offset(x: -4, y: -4)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(isCurrentUser ? 
-                              Color(red: 0.7, green: 0.85, blue: 1.0) :    // 淺藍色（用戶訊息）
-                              Color(red: 0.94, green: 0.94, blue: 0.92))   // 改為米白色（對方訊息）
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(isCurrentUser ? 
-                                       Color.clear : 
-                                       Color(red: 0.8, green: 0.8, blue: 0.78), lineWidth: 1)  // 對方訊息添加邊框
-                        )
-                )
                 
                 // 回覆狀態顯示
                 if let currentUserUID = Auth.auth().currentUser?.uid,
@@ -686,4 +778,27 @@ struct MessageBubbleView: View {
 
 #Preview {
     EmotionChatView()
-} 
+}
+
+#Preview("Message Bubble") {
+    MessageBubbleView(
+        message: EmotionChatMessage(
+            id: "test-id",
+            fromUID: "test-uid",
+            fromName: "測試用戶",
+            emoji: "🙏",
+            text: "對唔住，唔係想傷害你",
+            type: .apology,
+            createdAt: Timestamp(),
+            expiresAt: Timestamp(date: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()),
+            replyStatus: nil,
+            replyByUID: nil,
+            isStarred: false
+        ),
+        isCurrentUser: false,
+        onQuickResponse: { _ in },
+        onReply: { _, _ in },
+        onToggleStar: { _, _ in }
+    )
+    .padding()
+}
