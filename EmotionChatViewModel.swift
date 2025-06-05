@@ -372,10 +372,23 @@ class EmotionChatViewModel: ObservableObject {
         return message.fromUID == auth.currentUser?.uid
     }
     
+    // MARK: - 顯示成功訊息的助手函數
+    private func showSuccessMessage(_ message: String) async {
+        await MainActor.run {
+            successMessage = message
+            showSuccessFeedback = true
+            
+            // 2秒後隱藏回饋
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.showSuccessFeedback = false
+            }
+        }
+    }
+    
     // MARK: - 自動清除過期訊息
     func cleanupExpiredMessages() async {
         guard let currentUser = auth.currentUser, !pairedWith.isEmpty else { 
-            await showSuccess("無法清理：用戶未登入或未配對")
+            await showSuccessMessage("無法清理：用戶未登入或未配對")
             return 
         }
         
@@ -398,14 +411,14 @@ class EmotionChatViewModel: ObservableObject {
             
             let count = snapshot.documents.count
             if count > 0 {
-                await showSuccess("已清除 \(count) 則過期訊息")
+                await showSuccessMessage("已清除 \(count) 則過期訊息")
             } else {
-                await showSuccess("沒有找到過期訊息")
+                await showSuccessMessage("沒有找到過期訊息")
             }
             print("已清除 \(count) 則過期訊息")
             
         } catch {
-            await showSuccess("清除失敗：\(error.localizedDescription)")
+            await showSuccessMessage("清除失敗：\(error.localizedDescription)")
             print("清除過期訊息失敗: \(error)")
         }
     }
@@ -452,7 +465,7 @@ class EmotionChatViewModel: ObservableObject {
             }
         }
         
-        await showSuccess("已添加 \(testMessages.count) 則測試訊息")
+        await showSuccessMessage("已添加 \(testMessages.count) 則測試訊息")
         print("已添加 \(testMessages.count) 則測試訊息")
     }
     
@@ -493,7 +506,7 @@ class EmotionChatViewModel: ObservableObject {
             }
         }
         
-        await showSuccess("已添加 \(expiredMessages.count) 則過期測試訊息")
+        await showSuccessMessage("已添加 \(expiredMessages.count) 則過期測試訊息")
         print("已添加 \(expiredMessages.count) 則過期測試訊息")
     }
     
