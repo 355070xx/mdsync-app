@@ -80,6 +80,12 @@ struct EmotionChatView: View {
                                 }
                             }
                             
+                            Button("⏰ 添加過期測試訊息") {
+                                Task {
+                                    await viewModel.addExpiredTestMessages()
+                                }
+                            }
+                            
                             Button("🗑️ 清理過期訊息") {
                                 Task {
                                     await viewModel.cleanupExpiredMessages()
