@@ -73,13 +73,31 @@ struct EmotionChatView: View {
                 
                 if viewModel.isEmotionChatEnabled {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("關閉通道") {
-                            Task {
-                                await viewModel.disableEmotionChat()
+                        Menu {
+                            Button("🧪 添加測試資料") {
+                                Task {
+                                    await viewModel.addTestMessages()
+                                }
                             }
+                            
+                            Button("🗑️ 清理過期訊息") {
+                                Task {
+                                    await viewModel.cleanupExpiredMessages()
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            Button("關閉通道", role: .destructive) {
+                                Task {
+                                    await viewModel.disableEmotionChat()
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color("TextColor"))
                         }
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.red)
                         .buttonStyle(PlainButtonStyle())
                     }
                 }

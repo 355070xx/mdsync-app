@@ -371,4 +371,86 @@ class EmotionChatViewModel: ObservableObject {
     func isCurrentUserMessage(_ message: EmotionChatMessage) -> Bool {
         return message.fromUID == auth.currentUser?.uid
     }
+    
+    // MARK: - 自動清除過期訊息
+    func cleanupExpiredMessages() async {
+        guard let currentUser = auth.currentUser, !pairedWith.isEmpty else { return }
+        
+        let pairID = createPairID(currentUserUID: currentUser.uid, partnerUID: pairedWith)
+        
+        do {
+            let snapshot = try await db.collection("emotionChats")
+                .document(pairID)
+                .collection("messages")
+                .whereField("expiresAt", isLessThan: Timestamp())
+                .getDocuments()
+            
+            let batch = db.batch()
+            
+            for document in snapshot.documents {
+                batch.deleteDocument(document.reference)
+            }
+            
+            try await batch.commit()
+            print("已清除 \(snapshot.documents.count) 則過期訊息")
+            
+        } catch {
+            print("清除過期訊息失敗: \(error)")
+        }
+    }
+    
+    // MARK: - 添加測試假資料
+    func addTestMessages() async {
+        guard let currentUser = auth.currentUser, !pairedWith.isEmpty else { return }
+        
+        let pairID = createPairID(currentUserUID: currentUser.uid, partnerUID: pairedWith)
+        let now = Date()
+        
+        // 假資料訊息
+        let testMessages: [(text: String?, emoji: String?, type: EmotionChatMessage.MessageType, fromCurrentUser: Bool, minutesAgo: Int)] = [
+            ("對不起，我剛才說話太重了...", "🙏", .apology, true, 30),
+            ("我也有錯，我們都冷靜一下吧", "😔", .message, false, 25),
+            (nil, "🫂", .hug, true, 20),
+            ("謝謝你的擁抱", "💕", .message, false, 18),
+            ("我需要一些時間思考", nil, .neutral, false, 15),
+            ("好的，我會給你空間", "✅", .message, true, 12),
+            ("其實我也很在意你的感受", "❤️", .hug, false, 8),
+            ("我們一起努力解決這個問題吧", "🤝", .message, true, 5)
+        ]
+        
+        for testMessage in testMessages {
+            let messageData: [String: Any] = [
+                "fromUID": testMessage.fromCurrentUser ? currentUser.uid : pairedWith,
+                "fromName": testMessage.fromCurrentUser ? getUserName() : partnerName,
+                "emoji": testMessage.emoji as Any,
+                "text": testMessage.text as Any,
+                "type": testMessage.type.rawValue,
+                "createdAt": Timestamp(date: Calendar.current.date(byAdding: .minute, value: -testMessage.minutesAgo, to: now) ?? now),
+                "expiresAt": Timestamp(date: Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now),
+                "replyStatus": NSNull(),
+                "replyByUID": NSNull()
+            ]
+            
+            do {
+                try await db.collection("emotionChats")
+                    .document(pairID)
+                    .collection("messages")
+                    .addDocument(data: messageData)
+            } catch {
+                print("添加測試訊息失敗: \(error)")
+            }
+        }
+        
+        print("已添加 \(testMessages.count) 則測試訊息")
+    }
+    
+    // MARK: - 定期清理過期訊息（背景任務）
+    func startPeriodicCleanup() {
+        // 每小時檢查一次過期訊息
+        Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+            Task { [weak self] in
+                await self?.cleanupExpiredMessages()
+            }
+        }
+    }
 } 
