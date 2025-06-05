@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct EmotionChatView: View {
     @StateObject private var viewModel = EmotionChatViewModel()
@@ -18,9 +19,12 @@ struct EmotionChatView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // 冷靜背景色
+                // 冷靜背景色 - 使用治癒系的淺色調
                 LinearGradient(
-                    colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.05)],
+                    colors: [
+                        Color(red: 0.95, green: 0.98, blue: 1.0),  // 極淺藍
+                        Color(red: 0.97, green: 1.0, blue: 0.98)   // 極淺綠
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -62,8 +66,9 @@ struct EmotionChatView: View {
                             Text("返回")
                                 .font(.system(size: 16, weight: .medium))
                         }
-                        .foregroundColor(Color("TextColor"))
+                        .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.1))  // 改為明顯的深色
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 
                 if viewModel.isEmotionChatEnabled {
@@ -75,6 +80,7 @@ struct EmotionChatView: View {
                         }
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.red)
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
             }
@@ -245,6 +251,11 @@ struct EmotionChatView: View {
                                 Task {
                                     await viewModel.sendQuickResponse(type: type)
                                 }
+                            },
+                            onReply: { messageID, replyStatus in
+                                Task {
+                                    await viewModel.replyToMessage(messageID: messageID, replyStatus: replyStatus)
+                                }
                             }
                         )
                     }
@@ -300,8 +311,18 @@ struct EmotionChatView: View {
                 // 輸入框和發送按鈕
                 HStack(spacing: 12) {
                     TextField("輸入訊息...", text: $messageText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
                         .font(.system(size: 16, weight: .regular, design: .rounded))
+                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))  // 深灰文字
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white)  // 純白背景
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color(red: 0.85, green: 0.85, blue: 0.85), lineWidth: 1)  // 淺灰邊框
+                                )
+                        )
                         .focused($isTextFieldFocused)
                         .keyboardType(.default)
                         .textInputAutocapitalization(.sentences)
@@ -312,20 +333,27 @@ struct EmotionChatView: View {
                         .onSubmit {
                             sendMessage()
                         }
-                        .background(Color.clear)
                     
-                    Button(action: sendMessage) {
+                    Button(action: {
+                        // 添加觸覺回饋
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        
+                        sendMessage()
+                    }) {
                         Image(systemName: "paperplane.fill")
-                            .font(.system(size: 18))
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white)
                             .frame(width: 44, height: 44)
                             .background(
                                 Circle()
                                     .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
-                                          Color.gray.opacity(0.5) : Color("PrimaryColor"))
+                                          Color.gray.opacity(0.5) : Color.blue)
                             )
                     }
+                    .buttonStyle(PlainButtonStyle())
                     .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isLoading)
+                    .contentShape(Circle())
                 }
                 
                 // 快速回應按鈕
@@ -379,11 +407,7 @@ struct EmotionChatView: View {
                             .frame(minWidth: 60, minHeight: 32)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(viewModel.isLoading ? Color.gray.opacity(0.05) : Color.gray.opacity(0.1))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
-                                    )
+                                    .fill(Color(red: 1.0, green: 1.0, blue: 0.98))  // 溫暖的白色
                             )
                             .scaleEffect(viewModel.isLoading ? 0.95 : 1.0)
                             .opacity(viewModel.isLoading ? 0.6 : 1.0)
@@ -398,7 +422,7 @@ struct EmotionChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.white)
+            .background(Color(red: 1.0, green: 1.0, blue: 0.98))  // 溫暖的白色
         }
         .confirmationDialog("選擇訊息類型", isPresented: $showingTypePicker, titleVisibility: .visible) {
             ForEach(EmotionChatMessage.MessageType.allCases, id: \.self) { type in
@@ -433,6 +457,7 @@ struct MessageBubbleView: View {
     let message: EmotionChatMessage
     let isCurrentUser: Bool
     let onQuickResponse: ((EmotionChatMessage.MessageType) -> Void)?
+    let onReply: ((String, EmotionChatMessage.ReplyStatus) -> Void)?
     
     var body: some View {
         HStack {
@@ -451,20 +476,112 @@ struct MessageBubbleView: View {
                     if let text = message.text, !text.isEmpty {
                         Text(text)
                             .font(.system(size: 16, weight: .regular, design: .rounded))
-                            .foregroundColor(isCurrentUser ? .white : Color("TextColor"))
+                            .foregroundColor(isCurrentUser ? 
+                                           Color(red: 0.1, green: 0.2, blue: 0.4) :  // 深藍灰
+                                           Color(red: 0.2, green: 0.2, blue: 0.2))   // 深灰
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(isCurrentUser ? Color("PrimaryColor") : Color.gray.opacity(0.1))
+                        .fill(isCurrentUser ? 
+                              Color(red: 0.7, green: 0.85, blue: 1.0) :    // 淺藍色（用戶訊息）
+                              Color(red: 0.94, green: 0.94, blue: 0.92))   // 改為米白色（對方訊息）
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(isCurrentUser ? 
+                                       Color.clear : 
+                                       Color(red: 0.8, green: 0.8, blue: 0.78), lineWidth: 1)  // 對方訊息添加邊框
+                        )
                 )
                 
-                // 快速回應按鈕（只對非當前用戶的道歉訊息顯示）
-                if !isCurrentUser && message.type == .apology {
+                // 回覆狀態顯示
+                if let currentUserUID = Auth.auth().currentUser?.uid,
+                   let replyStatusText = message.getReplyStatusText(currentUserUID: currentUserUID) {
+                    HStack(spacing: 4) {
+                        if let replyStatus = message.replyStatus {
+                            Text(replyStatus.emoji)
+                                .font(.system(size: 12))
+                        }
+                        Text(replyStatusText)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.3))  // 改為更明顯的深灰色
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(red: 0.95, green: 0.97, blue: 1.0))  // 極淺藍色
+                    )
+                }
+                
+                // 回覆按鈕（只對非當前用戶且可回覆的訊息顯示，且未被回覆過）
+                if !isCurrentUser && message.type.canBeReplied && !message.isReplied,
+                   let messageID = message.id {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("回覆這段訊息？")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.3))  // 改為更明顯的深灰色
+                        
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                onReply?(messageID, .accepted)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Text("✅")
+                                        .font(.system(size: 12))
+                                    Text("接受")
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                }
+                                .foregroundColor(Color(red: 0.3, green: 0.6, blue: 0.8))  // 柔和藍色
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(red: 0.9, green: 0.95, blue: 1.0))  // 極淺藍背景
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color(red: 0.7, green: 0.85, blue: 0.95), lineWidth: 1)
+                                        )
+                                )
+                            }
+                            
+                            Button(action: {
+                                onReply?(messageID, .later)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Text("🕓")
+                                        .font(.system(size: 12))
+                                    Text("稍後再回應")
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                }
+                                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.4))  // 溫暖中性色
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(red: 0.96, green: 0.96, blue: 0.94))  // 溫暖淺灰
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color(red: 0.85, green: 0.85, blue: 0.82), lineWidth: 1)
+                                        )
+                                )
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                
+                // 快速回應按鈕（只對非當前用戶的道歉訊息顯示，且保留舊功能）
+                if !isCurrentUser && message.type == .apology && message.isReplied {
                     HStack(spacing: 8) {
                         Button(action: {
+                            // 添加觸覺回饋
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            
+                            print("和好吧按鈕被點擊")
                             onQuickResponse?(.hug)
                         }) {
                             HStack(spacing: 4) {
@@ -473,20 +590,27 @@ struct MessageBubbleView: View {
                                 Text("和好吧")
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
                             }
-                            .foregroundColor(Color("PrimaryColor"))
+                            .foregroundColor(Color(red: 0.3, green: 0.6, blue: 0.8))  // 柔和藍色
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color("PrimaryColor").opacity(0.1))
+                                    .fill(Color(red: 0.9, green: 0.95, blue: 1.0))  // 極淺藍背景
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color("PrimaryColor").opacity(0.3), lineWidth: 1)
+                                            .stroke(Color(red: 0.7, green: 0.85, blue: 0.95), lineWidth: 1)
                                     )
                             )
                         }
+                        .buttonStyle(PlainButtonStyle())
+                        .contentShape(Rectangle())
                         
                         Button(action: {
+                            // 添加觸覺回饋
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            
+                            print("等一下按鈕被點擊")
                             onQuickResponse?(.neutral)
                         }) {
                             HStack(spacing: 4) {
@@ -495,18 +619,20 @@ struct MessageBubbleView: View {
                                 Text("等一下")
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
                             }
-                            .foregroundColor(Color("SecondaryColor"))
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.4))  // 溫暖中性色
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.1))
+                                    .fill(Color(red: 0.96, green: 0.96, blue: 0.94))  // 溫暖淺灰
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                            .stroke(Color(red: 0.85, green: 0.85, blue: 0.82), lineWidth: 1)
                                     )
                             )
                         }
+                        .buttonStyle(PlainButtonStyle())
+                        .contentShape(Rectangle())
                     }
                     .padding(.top, 4)
                 }
@@ -515,15 +641,15 @@ struct MessageBubbleView: View {
                 HStack(spacing: 4) {
                     Text(message.formatCreatedTime())
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(Color("SecondaryColor"))
+                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.4))  // 改為更明顯的灰色
                     
                     Text("•")
                         .font(.system(size: 11))
-                        .foregroundColor(Color("SecondaryColor"))
+                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.4))  // 改為更明顯的灰色
                     
                     Text(message.type.displayText)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(Color("SecondaryColor"))
+                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.4))  // 改為更明顯的灰色
                 }
             }
             

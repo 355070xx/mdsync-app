@@ -189,7 +189,9 @@ class EmotionChatViewModel: ObservableObject {
                 "text": text as Any,
                 "type": type.rawValue,
                 "createdAt": Timestamp(),
-                "expiresAt": expiresAt
+                "expiresAt": expiresAt,
+                "replyStatus": NSNull(),
+                "replyByUID": NSNull()
             ]
             
             try await db.collection("emotionChats")
@@ -261,6 +263,53 @@ class EmotionChatViewModel: ObservableObject {
             emoji: type.defaultEmoji,
             type: type
         )
+    }
+    
+    // MARK: - 回覆訊息
+    func replyToMessage(messageID: String, replyStatus: EmotionChatMessage.ReplyStatus) async {
+        guard let currentUser = auth.currentUser, !pairedWith.isEmpty, isEmotionChatEnabled else { return }
+        
+        isLoading = true
+        
+        do {
+            let pairID = createPairID(currentUserUID: currentUser.uid, partnerUID: pairedWith)
+            
+            // 更新訊息的回覆狀態
+            try await db.collection("emotionChats")
+                .document(pairID)
+                .collection("messages")
+                .document(messageID)
+                .updateData([
+                    "replyStatus": replyStatus.rawValue,
+                    "replyByUID": currentUser.uid
+                ])
+            
+            // 如果選擇「稍後再回應」，發送一則訊息
+            if replyStatus == .later {
+                await sendMessage(
+                    text: "等一下",
+                    emoji: "🤔",
+                    type: .neutral
+                )
+            }
+            
+            // 顯示成功回饋
+            successMessage = "已回覆：\(replyStatus.displayText)"
+            showSuccessFeedback = true
+            
+            // 2秒後隱藏回饋
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.showSuccessFeedback = false
+            }
+            
+            // 更新通知狀態
+            try await updateNotificationStatus(pairID: pairID, currentUser: currentUser)
+            
+        } catch {
+            handleError(error)
+        }
+        
+        isLoading = false
     }
     
     // MARK: - 停用情緒聊天

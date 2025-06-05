@@ -72,8 +72,13 @@ service cloud.firestore {
                      request.resource.data.type in ['message', 'apology', 'hug', 'reject', 'neutral'] &&
                      request.resource.data.expiresAt.toMillis() > request.time.toMillis();
         
-        // 不允許修改或刪除訊息
-        allow update, delete: if false;
+        // 允許回覆訊息（只能更新 replyStatus 和 replyByUID 欄位）
+        allow update: if request.auth != null && 
+                     isUserInPair(request.auth.uid, pairID) &&
+                     isValidReplyUpdate(request.auth.uid, resource.data);
+        
+        // 不允許刪除訊息
+        allow delete: if false;
       }
     }
     
@@ -120,6 +125,26 @@ service cloud.firestore {
       let validPairingValue = newData.pairedWith == requesterUID;
       
       return onlyPairedWithChanged && validPairingValue;
+    }
+    
+    // 驗證回覆更新是否有效
+    function isValidReplyUpdate(userUID, existingData) {
+      // 確保原本沒有回覆過（防止重複回覆）
+      let notPreviouslyReplied = existingData.replyStatus == null && existingData.replyByUID == null;
+      
+      // 確保不是回覆自己的訊息
+      let notSelfReply = existingData.fromUID != userUID;
+      
+      // 檢查更新的資料是否只包含允許的欄位
+      let onlyAllowedFields = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replyStatus', 'replyByUID']);
+      
+      // 檢查 replyByUID 是否為請求者的 UID
+      let validReplier = request.resource.data.replyByUID == userUID;
+      
+      // 檢查回覆狀態是否有效
+      let validReplyStatus = request.resource.data.replyStatus in ['accepted', 'later'];
+      
+      return notPreviouslyReplied && notSelfReply && onlyAllowedFields && validReplier && validReplyStatus;
     }
   }
 } 

@@ -18,6 +18,33 @@ struct EmotionChatMessage: Identifiable, Codable {
     let createdAt: Timestamp
     let expiresAt: Timestamp
     
+    // 新增回覆狀態欄位
+    let replyStatus: ReplyStatus?
+    let replyByUID: String?
+    
+    enum ReplyStatus: String, CaseIterable, Codable {
+        case accepted = "accepted"
+        case later = "later"
+        
+        var displayText: String {
+            switch self {
+            case .accepted:
+                return "接受"
+            case .later:
+                return "稍後再回應"
+            }
+        }
+        
+        var emoji: String {
+            switch self {
+            case .accepted:
+                return "✅"
+            case .later:
+                return "🕓"
+            }
+        }
+    }
+    
     enum MessageType: String, CaseIterable, Codable {
         case message = "message"
         case apology = "apology"
@@ -54,6 +81,16 @@ struct EmotionChatMessage: Identifiable, Codable {
                 return "😐"
             }
         }
+        
+        // 新增：檢查是否可以被回覆
+        var canBeReplied: Bool {
+            switch self {
+            case .apology, .hug, .reject:
+                return true
+            case .message, .neutral:
+                return false
+            }
+        }
     }
     
     // 檢查訊息是否已過期
@@ -64,6 +101,26 @@ struct EmotionChatMessage: Identifiable, Codable {
     // 計算剩餘時間
     var timeRemaining: TimeInterval {
         return expiresAt.dateValue().timeIntervalSince(Date())
+    }
+    
+    // 新增：檢查是否已經被回覆
+    var isReplied: Bool {
+        return replyStatus != nil && replyByUID != nil
+    }
+    
+    // 新增：獲取回覆狀態顯示文字
+    func getReplyStatusText(currentUserUID: String) -> String? {
+        guard let replyStatus = replyStatus, let replyByUID = replyByUID else { return nil }
+        
+        let isCurrentUserReply = replyByUID == currentUserUID
+        let prefix = isCurrentUserReply ? "你" : "對方"
+        
+        switch replyStatus {
+        case .accepted:
+            return "\(prefix)接受了這個\(type.displayText)"
+        case .later:
+            return "\(prefix)選擇稍後再回應"
+        }
     }
     
     // 格式化時間顯示
